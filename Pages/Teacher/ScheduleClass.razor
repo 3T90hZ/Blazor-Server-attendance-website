@@ -1,0 +1,131 @@
+﻿@page "/teacher/schedule"
+@using AttendanceApp.Models
+@using AttendanceApp.Data
+@attribute [Authorize(Policy = "TeacherOnly")]
+@inject ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+
+<h3>Schedule a Class</h3>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+<EditForm Model="@classSchedule" OnValidSubmit="HandleSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label for="subject">Subject:</label>
+        <InputText id="subject" class="form-control" @bind-Value="classSchedule.Subject" />
+        <ValidationMessage For="() => classSchedule.Subject" />
+    </div>
+
+    <div class="form-group">
+        <label for="date">Date:</label>
+        <InputDate id="date" class="form-control" @bind-Value="classSchedule.DateTime" />
+        <ValidationMessage For="() => classSchedule.DateTime" />
+    </div>
+
+    <div class="form-group">
+        <label for="time">Time:</label>
+        <InputText id="time" type="time" class="form-control" @bind-Value="timeString" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Schedule</button>
+</EditForm>
+
+<h3 class="mt-4">Scheduled Classes</h3>
+@if (scheduledClasses == null || !scheduledClasses.Any())
+{
+    <p>No classes scheduled.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Subject</th>
+                <th>Date & Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var schedule in scheduledClasses)
+            {
+                <tr>
+                    <td>@schedule.Subject</td>
+                    <td>@schedule.DateTime.ToString("dd/MM/yy h:mm tt")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private ClassSchedule classSchedule = new ClassSchedule();
+    private List<ClassSchedule> scheduledClasses = new List<ClassSchedule>();
+    private string message;
+    private string timeString;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var teacherId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (teacherId != null)
+        {
+            scheduledClasses = DbContext.ClassSchedules
+                .Where(cs => cs.TeacherId == teacherId)
+                .ToList();
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        Console.WriteLine("HandleSubmit called");
+
+        // Combine date and time
+        if (!string.IsNullOrEmpty(timeString) && TimeSpan.TryParse(timeString, out var timeOfDay))
+        {
+            classSchedule.DateTime = classSchedule.DateTime.Date + timeOfDay;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var teacherId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (teacherId == null)
+        {
+            Console.WriteLine("TeacherId is null");
+            message = "Error: Could not determine the teacher ID.";
+            return;
+        }
+
+        classSchedule.TeacherId = teacherId;
+        Console.WriteLine($"Scheduling class: Subject={classSchedule.Subject}, DateTime={classSchedule.DateTime}, TeacherId={teacherId}");
+
+        try
+        {
+            DbContext.ClassSchedules.Add(classSchedule);
+            await DbContext.SaveChangesAsync();
+            Console.WriteLine("Class scheduled successfully");
+            message = "Class scheduled successfully!";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving to database: {ex.Message}");
+            message = $"Error: {ex.Message}";
+            return;
+        }
+
+        scheduledClasses = DbContext.ClassSchedules
+            .Where(cs => cs.TeacherId == teacherId)
+            .ToList();
+
+        classSchedule = new ClassSchedule();
+        timeString = null;
+    }
+}

@@ -1,0 +1,124 @@
+﻿@page "/teacher/attendance/{ClassScheduleId:int}"
+@using AttendanceApp.Models
+@using AttendanceApp.Data
+@attribute [Authorize(Policy = "TeacherOnly")]
+@inject ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+
+<h3>Take Attendance</h3>
+
+@if (classSchedule == null)
+{
+    <p>Class not found.</p>
+}
+else
+{
+    <h4>@classSchedule.Subject - @classSchedule.DateTime.ToString("g")</h4>
+
+    @if (students == null || !students.Any())
+    {
+        <p>No students found.</p>
+    }
+    else
+    {
+        <EditForm Model="@attendanceRecords" OnValidSubmit="SaveAttendance">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Present</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < students.Count; i++)
+                    {
+                        var index = i; // Capture the loop variable for use in lambda
+                        <tr>
+                            <td>@students[index].Email</td>
+                            <td>
+                                <InputCheckbox @bind-Value="attendanceRecords[index].IsPresent" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <button type="submit" class="btn btn-primary">Save Attendance</button>
+        </EditForm>
+    }
+}
+
+@code {
+    [Parameter]
+    public int ClassScheduleId { get; set; }
+
+    private ClassSchedule classSchedule;
+    private List<ApplicationUser> students;
+    private List<AttendanceRecord> attendanceRecords = new List<AttendanceRecord>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load the class schedule
+        classSchedule = DbContext.ClassSchedules
+            .FirstOrDefault(cs => cs.Id == ClassScheduleId);
+
+        if (classSchedule == null)
+        {
+            return;
+        }
+
+        // Load all students (users with Role = "Student")
+        students = DbContext.Users
+            .Where(u => u.Role == "Student")
+            .ToList();
+
+        // Initialize attendance records for each student
+        foreach (var student in students)
+        {
+            var existingAttendance = DbContext.AttendanceRecords
+                .FirstOrDefault(a => a.ClassScheduleId == ClassScheduleId && a.StudentId == student.Id);
+
+            if (existingAttendance != null)
+            {
+                attendanceRecords.Add(existingAttendance);
+            }
+            else
+            {
+                attendanceRecords.Add(new AttendanceRecord
+                    {
+                        ClassScheduleId = ClassScheduleId,
+                        StudentId = student.Id,
+                        IsPresent = false // Default to not present
+                    });
+            }
+        }
+    }
+
+    private async Task SaveAttendance()
+    {
+        // Save or update attendance records
+        foreach (var record in attendanceRecords)
+        {
+            var existingRecord = DbContext.AttendanceRecords
+                .FirstOrDefault(a => a.ClassScheduleId == record.ClassScheduleId && a.StudentId == record.StudentId);
+
+            if (existingRecord != null)
+            {
+                existingRecord.IsPresent = record.IsPresent;
+            }
+            else
+            {
+                DbContext.AttendanceRecords.Add(record);
+            }
+        }
+
+        await DbContext.SaveChangesAsync();
+
+        // Navigate back to the attendance list
+        Navigation.NavigateTo("/teacher/attendance");
+    }
+}

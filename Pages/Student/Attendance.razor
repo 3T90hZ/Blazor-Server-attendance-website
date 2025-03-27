@@ -1,0 +1,37 @@
+﻿@using AttendanceApp.Data
+@using AttendanceApp.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Authorization
+@page "/student/attendance"
+@attribute [Authorize(Policy = "StudentOnly")]
+
+<h3>My Attendance</h3>
+<ul>
+    @foreach (var attendance in attendances)
+    {
+        <li>@attendance.ClassSchedule.Subject - @(attendance.IsPresent ? "Present" : "Absent")</li>
+    }
+</ul>
+
+@code {
+    [Inject] ApplicationDbContext DbContext { get; set; }
+    [Inject] UserManager<ApplicationUser> UserManager { get; set; }
+    [Inject] AuthenticationStateProvider AuthenticationStateProvider { get; set; }
+    // Explicitly use the model type
+    private List<AttendanceApp.Models.AttendanceRecord> attendances = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var student = await UserManager.GetUserAsync(user);
+        if (student != null)
+        {
+            attendances = await DbContext.AttendanceRecords
+                .Include(a => a.ClassSchedule)
+                .Where(a => a.StudentId == student.Id)
+                .ToListAsync();
+        }
+    }
+}

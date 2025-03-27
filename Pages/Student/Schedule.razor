@@ -1,0 +1,24 @@
+﻿@using AttendanceApp.Data
+@using AttendanceApp.Models
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations;
+@page "/student/schedule"
+@attribute [Authorize(Policy = "StudentOnly")]
+
+<h3>Class Schedule</h3>
+<ul>
+    @foreach (var classSchedule in classSchedules)
+    {
+        <li>@classSchedule.Subject - @classSchedule.DateTime</li>
+    }
+</ul>
+
+@code {
+    [Inject] ApplicationDbContext DbContext { get; set; }
+    private List<ClassSchedule> classSchedules = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        classSchedules = await DbContext.ClassSchedules.Include(c => c.Teacher).ToListAsync();
+    }
+}

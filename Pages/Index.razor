@@ -1,0 +1,53 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<h1>Welcome to AttendanceApp!</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p>Hello, @context.User.Identity.Name!</p>
+        <AuthorizeView Policy="TeacherOnly">
+            <Authorized Context="T">
+                <p><a href="/teacher/schedule">Schedule a Class</a></p>
+                <p><a href="/teacher/attendance">Take Attendance</a></p>
+            </Authorized>
+        </AuthorizeView>
+        <AuthorizeView Policy="StudentOnly">
+            <Authorized Context="S">
+                <p><a href="/student/schedule">View Schedule</a></p>
+                <p><a href="/student/attendance">View Attendance</a></p>
+            </Authorized>
+        </AuthorizeView>
+    </Authorized>
+    <NotAuthorized>
+        <p>Please log in to access your features.</p>
+        <p><a href="/Identity/Account/Login?returnUrl=/">Log in</a> to get started.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            if (user.Claims.Any(c => c.Type == "Role" && c.Value == "Teacher"))
+            {
+                Navigation.NavigateTo("/teacher/schedule");
+            }
+            else if (user.Claims.Any(c => c.Type == "Role" && c.Value == "Student"))
+            {
+                Navigation.NavigateTo("/student/schedule");
+            }
+        }
+        else
+        {
+            // Redirect to login page if not authenticated
+            Navigation.NavigateTo("/Identity/Account/Login?returnUrl=/", forceLoad: true);
+        }
+    }
+}

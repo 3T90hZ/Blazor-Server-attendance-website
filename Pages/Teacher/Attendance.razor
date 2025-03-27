@@ -1,0 +1,62 @@
+﻿@page "/teacher/attendance"
+@using AttendanceApp.Models
+@using AttendanceApp.Data
+@attribute [Authorize(Policy = "TeacherOnly")]
+@inject ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+
+<h3>Take Attendance</h3>
+
+@if (scheduledClasses == null || !scheduledClasses.Any())
+{
+    <p>No classes scheduled.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Subject</th>
+                <th>Date & Time</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var schedule in scheduledClasses)
+            {
+                <tr>
+                    <td>@schedule.Subject</td>
+                    <td>@schedule.DateTime.ToString("dd/MM/yy h:mm tt")</td>
+                    <td>
+                        <button class="btn btn-primary" @onclick="() => TakeAttendance(schedule.Id)">Take Attendance</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ClassSchedule> scheduledClasses = new List<ClassSchedule>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var teacherId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (teacherId != null)
+        {
+            scheduledClasses = DbContext.ClassSchedules
+                .Where(cs => cs.TeacherId == teacherId)
+                .ToList();
+        }
+    }
+
+    private void TakeAttendance(int classScheduleId)
+    {
+        // Navigate to a page where the teacher can take attendance for the selected class
+        Navigation.NavigateTo($"/teacher/attendance/{classScheduleId}");
+    }
+}

@@ -1,0 +1,13 @@
+﻿@page
+@model LogoutModel
+@{
+    ViewData["Title"] = "Log out";
+}
+
+<h1>@ViewData["Title"]</h1>
+<p>You have successfully logged out of the application.</p>
+<form asp-route-returnUrl="@Model.ReturnUrl" method="post">
+    <input type="hidden" asp-for="ReturnUrl" />
+    <button type="submit" class="btn btn-primary">Log out</button>
+</form>
+<p><a href="/">Return to Home</a></p>
