@@ -1,37 +1,57 @@
-﻿@using AttendanceApp.Data
+@using AttendanceApp.Data
 @using AttendanceApp.Models
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @page "/student/attendance"
 @attribute [Authorize(Policy = "StudentOnly")]
 
-<h3>My Attendance</h3>
-<ul>
-    @foreach (var attendance in attendances)
-    {
-        <li>@attendance.ClassSchedule.Subject - @(attendance.IsPresent ? "Present" : "Absent")</li>
-    }
-</ul>
+<h3>View Attendance</h3>
+
+@if (attendanceRecords == null || !attendanceRecords.Any())
+{
+    <p>No attendance records found.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Subject</th>
+                <th>Date & Time</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var record in attendanceRecords)
+            {
+                <tr>
+                    <td>@record.ClassSchedule.Subject</td>
+                    <td>@record.ClassSchedule.DateTime.ToString("dd/MM/yy h:mm tt")</td>
+                    <td>@(record.IsPresent ? "Present" : "Absent")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
 
 @code {
     [Inject] ApplicationDbContext DbContext { get; set; }
-    [Inject] UserManager<ApplicationUser> UserManager { get; set; }
-    [Inject] AuthenticationStateProvider AuthenticationStateProvider { get; set; }
-    // Explicitly use the model type
-    private List<AttendanceApp.Models.AttendanceRecord> attendances = new();
+    private List<AttendanceRecord> attendanceRecords = new List<AttendanceRecord>();
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-        var student = await UserManager.GetUserAsync(user);
-        if (student != null)
+        var studentId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (studentId != null)
         {
-            attendances = await DbContext.AttendanceRecords
-                .Include(a => a.ClassSchedule)
-                .Where(a => a.StudentId == student.Id)
-                .ToListAsync();
+            attendanceRecords = DbContext.AttendanceRecords
+                .Include(a => a.ClassSchedule) // Include the related ClassSchedule
+                .Where(a => a.StudentId == studentId)
+                .ToList();
         }
     }
 }
